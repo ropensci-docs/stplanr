@@ -1,0 +1,15 @@
+pandoc: '2.5'
+pkgdown: 1.6.1
+pkgdown_sha: ~
+articles:
+  stplanr-od: stplanr-od.html
+  stplanr-paper: stplanr-paper.html
+  stplanr-parallel: stplanr-parallel.html
+  stplanr-route-nets: stplanr-route-nets.html
+  stplanr-routing: stplanr-routing.html
+  stplanr: stplanr.html
+last_built: 2021-07-09T09:55Z
+urls:
+  reference: https://docs.ropensci.org/stplanr/reference
+  article: https://docs.ropensci.org/stplanr/articles
+

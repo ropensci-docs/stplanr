@@ -1,0 +1,12 @@
+{
+  "commit": {
+    "commit": "467252e1cf91352e21a6debd7726fa2931fec53a",
+    "author": "Edzer Pebesma <edzer.pebesma@uni-muenster.de>",
+    "time": "2021-06-29 08:12:20",
+    "files": 1,
+    "merge": false,
+    "message": "Update DESCRIPTION (#464)\n\n"
+  },
+  "remote": "https://github.com/ropensci/stplanr",
+  "pkg": "stplanr"
+}
