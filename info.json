@@ -1,0 +1,12 @@
+{
+  "commit": {
+    "commit": "42773e7412dbf0c633677a2eb80505eaa0ca24d5",
+    "author": "Robin Lovelace <Robinlovelace@users.noreply.github.com>",
+    "time": "2024-03-14 17:22:49",
+    "files": 3,
+    "merge": true,
+    "message": "Merge pull request #555 from ropensci/handle_strings\n\nhandle strings"
+  },
+  "repo": "https://github.com/ropensci/stplanr",
+  "pkg": "stplanr"
+}
