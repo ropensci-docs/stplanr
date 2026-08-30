@@ -1,0 +1,602 @@
+# stplanr
+
+[![rstudio mirror
+downloads](https://cranlogs.r-pkg.org/badges/stplanr)](https://github.com/r-hub/cranlogs.app)
+[![](https://cranlogs.r-pkg.org/badges/grand-total/stplanr)](https://cran.r-project.org/package=stplanr)
+[![CRAN_Status_Badge](https://www.r-pkg.org/badges/version/stplanr)](https://cran.r-project.org/package=stplanr)
+[![lifecycle](https://img.shields.io/badge/lifecycle-maturing-blue.svg)](https://lifecycle.r-lib.org/articles/stages.html)
+[![](https://badges.ropensci.org/10_status.svg)](https://github.com/ropensci/software-review/issues/10)
+[![R-CMD-check](https://github.com/ropensci/stplanr/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/ropensci/stplanr/actions/workflows/R-CMD-check.yaml)
+
+**stplanr** is a package for sustainable transport planning with R.
+
+It provides functions for solving common problems in transport planning
+and modelling, such as how to best get from point A to point B. The
+overall aim is to provide a reproducible, transparent and accessible
+toolkit to help people better understand transport systems and inform
+policy, as outlined in a
+[paper](https://journal.r-project.org/archive/2018/RJ-2018-053/index.html)
+about the package, and the potential for open source software in
+transport planning in general, published in the [R
+Journal](https://journal.r-project.org/).
+
+The initial work on the project was funded by the Department of
+Transport
+([DfT](https://www.gov.uk/government/organisations/department-for-transport))
+as part of the development of the Propensity to Cycle Tool (PCT), a web
+application to explore current travel patterns and cycling potential at
+zone, desire line, route and route network levels (see
+[www.pct.bike](https://www.pct.bike/) and click on a region to try it
+out). The basis of the methods underlying the PCT is origin-destination
+data, which are used to highlight where many short distance trips are
+being made, and estimate how many could switch to cycling. The results
+help identify where cycleways are most needed, an important component of
+sustainable transport planning infrastructure engineering and policy
+design.
+
+See the package vignette (e.g. via `vignette("introducing-stplanr")`) or
+an [academic paper on the Propensity to Cycle Tool
+(PCT)](https://dx.doi.org/10.5198/jtlu.2016.862) for more information on
+how it can be used. This README provides some basics.
+
+Much of the work supports research undertaken at the Leeds’ Institute
+for Transport Studies ([ITS](https://environment.leeds.ac.uk/transport))
+but **stplanr** should be useful to transport researchers and
+practitioners needing free, open and reproducible methods for working
+with geographic data everywhere.
+
+## Key functions
+
+Data frames representing flows between origins and destinations must be
+combined with geo-referenced zones or points to generate meaningful
+analyses and visualisations of ‘flows’ or origin-destination (OD) data.
+**stplanr** facilitates this with
+[`od2line()`](https://docs.ropensci.org/stplanr/reference/od2line.md),
+which takes flow and geographical data as inputs and outputs spatial
+data. Some example data is provided in the package:
+
+``` r
+
+library(stplanr)
+```
+
+Let’s take a look at this data:
+
+``` r
+
+od_data_sample[1:3, 1:3] # typical form of flow data
+#> # A tibble: 3 × 3
+#>   geo_code1 geo_code2   all
+#>   <chr>     <chr>     <dbl>
+#> 1 E02002361 E02002361   109
+#> 2 E02002361 E02002363    38
+#> 3 E02002361 E02002367    10
+cents_sf[1:3,] # points representing origins and destinations
+#>       geo_code  MSOA11NM percent_fem  avslope             geometry
+#> 1708 E02002384 Leeds 055    0.458721 2.856563 -1.546463, 53.809517
+#> 1712 E02002382 Leeds 053    0.438144 2.284782 -1.511861, 53.811611
+#> 1805 E02002393 Leeds 064    0.408759 2.361707 -1.524205, 53.804098
+```
+
+These datasets can be combined as follows:
+
+``` r
+
+travel_network <- od2line(flow = od_data_sample, zones = cents_sf)
+w <- flow$all / max(flow$all) *10
+plot(travel_network, lwd = w)
+```
+
+![](reference/figures/README-plot1-1.png)
+
+**stplanr** has many functions for working with OD data. See the
+[`stplanr-od`](https://docs.ropensci.org/stplanr/articles/stplanr-od.html)
+vignette for details.
+
+The package can also allocate flows to the road network, e.g. with
+[CycleStreets.net](https://www.cyclestreets.net/api/) and the
+OpenStreetMap Routing Machine
+([OSRM](https://github.com/Project-OSRM/osrm-backend)) API interfaces.
+These are supported in `route_*()` functions such as
+`route_cyclestreets` and
+[`route_osrm()`](https://docs.ropensci.org/stplanr/reference/route_osrm.md):
+
+Routing can be done using a range of back-ends and using lat/lon or
+desire line inputs with the
+[`route()`](https://docs.ropensci.org/stplanr/reference/route.md)
+function, as illustrated by the following commands which calculates the
+route between Fleet Street and Southwark Street over the River Thames on
+Blackfriars Bridge in London:
+
+``` r
+
+library(osrm)
+#> Data: (c) OpenStreetMap contributors, ODbL 1.0 - http://www.openstreetmap.org/copyright
+#> Routing: OSRM - http://project-osrm.org/
+trip <- route(
+  from = c(-0.11, 51.514),
+  to = c(-0.10, 51.506),
+  route_fun = osrmRoute,
+  returnclass = "sf"
+  )
+#> Warning: "returnclass" is deprecated.
+#> Most common output is sf
+plot(trip)
+```
+
+![](reference/figures/README-unnamed-chunk-5-1.png)
+
+You can also use and place names, found using the Google Map API:
+
+``` r
+
+trip2 <- route(
+  from = "Leeds",
+  to = "Bradford",
+  route_fun = osrmRoute,
+  returnclass = "sf"
+  )
+#> Warning: "returnclass" is deprecated.
+#> Most common output is sf
+plot(trip2)
+```
+
+![](reference/figures/README-unnamed-chunk-6-1.png)
+
+We can replicate this call multiple times with the `l` argument in
+[`route()`](https://docs.ropensci.org/stplanr/reference/route.md):
+
+``` r
+
+desire_lines <- travel_network[2:6, ]
+```
+
+Next, we’ll calculate the routes:
+
+``` r
+
+routes <- route(
+  l = desire_lines,
+  route_fun = osrmRoute,
+  returnclass = "sf"
+  )
+#> Warning: "returnclass" is deprecated.
+#> Warning: "returnclass" is deprecated.
+#> Warning: "returnclass" is deprecated.
+#> Warning: "returnclass" is deprecated.
+#> Warning: "returnclass" is deprecated.
+plot(sf::st_geometry(routes))
+plot(desire_lines, col = "red", add = TRUE)
+#> Warning in plot.sf(desire_lines, col = "red", add = TRUE): ignoring all but the
+#> first attribute
+```
+
+![](reference/figures/README-plot2-1.png)
+
+For more examples, `example("route")`.
+
+[`overline()`](https://docs.ropensci.org/stplanr/reference/overline.md)
+takes a series of route-allocated lines, splits them into unique
+segments and aggregates the values of overlapping lines. This can
+represent where there will be most traffic on the transport system, as
+demonstrated in the following code chunk.
+
+``` r
+
+routes$foot <- desire_lines$foot
+rnet <- overline(routes, attrib = "foot")
+```
+
+The resulting route network, with segment totals calculated from
+overlapping parts for the routes for walking, can be visualised as
+follows:
+
+``` r
+
+plot(rnet["foot"], lwd = rnet$foot)
+```
+
+![](reference/figures/README-unnamed-chunk-9-1.png)
+
+The above plot represents the number walking trips made (the ‘flow’)
+along particular segments of a transport network.
+
+## Policy applications
+
+The examples shown above, based on tiny demonstration datasets, may not
+seem particularly revolutionary. At the city scale, however, this type
+of analysis can be used to inform sustainable transport policies, as
+described in papers [describing the Propensity to Cycle
+Tool](https://www.jtlu.org/index.php/jtlu/article/view/862/859) (PCT),
+and its [application to calculate cycling to school
+potential](https://doi.org/10.1016/j.jth.2019.01.008) across England.
+
+Results generated by **stplanr** are now part of national government
+policy: the PCT is the recommended tool for local and regional
+authorities developing strategic cycle network under the Cycling and
+Walking Infrastructure Strategy
+([CWIS](https://www.gov.uk/government/publications/cycling-and-walking-investment-strategy)),
+which is part of the Infrastructure Act
+[2015](https://www.legislation.gov.uk/ukpga/2015/7/contents/enacted).
+**stplanr** is helping dozens of local authorities across the UK to
+answer the question: where to prioritise investment in cycling? In
+essence, stplanr was designed to support sustainable transport policies.
+
+There are many other research and policy questions that functions in
+**stplanr**, and other open source software libraries and packages, can
+help answer. At a time of climate, health and social crises, it is
+important that technology is not only sustainable itself (e.g. as
+enabled by open source communities and licenses) but that it contributes
+to a sustainable future.
+
+## Installation
+
+To install the stable version, use:
+
+``` r
+
+install.packages("stplanr")
+```
+
+The development version can be installed using **devtools**:
+
+``` r
+
+# install.packages("devtools") # if not already installed
+devtools::install_github("ropensci/stplanr")
+library(stplanr)
+```
+
+### Installing stplanr on Linux and Mac
+
+**stplanr** depends on **sf**. Installation instructions for Mac, Ubuntu
+and other Linux distros can be found here:
+<https://github.com/r-spatial/sf#installing>
+
+## Funtions, help and contributing
+
+The current list of available functions can be seen on the package’s
+website at
+[docs.ropensci.org/stplanr/](https://docs.ropensci.org/stplanr/), or
+with the following command:
+
+``` r
+
+lsf.str("package:stplanr", all = TRUE)
+```
+
+To get internal help on a specific function, use the standard way.
+
+``` r
+
+?od2line
+```
+
+To contribute, report bugs or request features, see the [issue
+tracker](https://github.com/ropensci/stplanr/issues).
+
+## Further resources / tutorials
+
+Want to learn how to use open source software for reproducible
+sustainable transport planning work? Now is a great time to learn.
+Transport planning is a relatively new field of application in R.
+However, there are already some good resources on the topic, including
+(any further suggestions: welcome):
+
+- The Transport chapter of *Geocomputation with R*, which provides a
+  broad introduction from a geographic data perspective:
+  <https://r.geocompx.org/transport.html>
+- The **stplanr** paper, which describes the context in which the
+  package was developed:
+  <https://journal.r-project.org/archive/2018/RJ-2018-053/index.html>
+  (please cite this if you use **stplanr** in your work)
+- The `dodgr` vignette, which provides an introduction to routing in R:
+  <https://github.com/UrbanAnalyst/dodgr>
+
+## Meta
+
+- Please report issues, feature requests and questions to the [github
+  issue tracker](https://github.com/ropensci/stplanr/issues)
+- License: MIT
+- Get citation information for **stplanr** in R doing
+  `citation(package = 'stplanr')`
+- This project is released with a [Contributor Code of
+  Conduct](https://github.com/ropensci/stplanr/blob/master/CONDUCT.md).
+  By participating in this project you agree to abide by its terms.
+
+# Package index
+
+## Work with OD data
+
+- [`od2line()`](https://docs.ropensci.org/stplanr/reference/od2line.md)
+  : Convert origin-destination data to spatial lines
+- [`od2odf()`](https://docs.ropensci.org/stplanr/reference/od2odf.md) :
+  Extract coordinates from OD data
+- [`od_aggregate_from()`](https://docs.ropensci.org/stplanr/reference/od_aggregate_from.md)
+  : Summary statistics of trips originating from zones in OD data
+- [`od_aggregate_to()`](https://docs.ropensci.org/stplanr/reference/od_aggregate_to.md)
+  : Summary statistics of trips arriving at destination zones in OD data
+- [`od_coords()`](https://docs.ropensci.org/stplanr/reference/od_coords.md)
+  : Create matrices representing origin-destination coordinates
+- [`od_coords2line()`](https://docs.ropensci.org/stplanr/reference/od_coords2line.md)
+  : Convert origin-destination coordinates into desire lines
+- [`od_id_szudzik()`](https://docs.ropensci.org/stplanr/reference/od_id.md)
+  [`od_id_max_min()`](https://docs.ropensci.org/stplanr/reference/od_id.md)
+  [`od_id_character()`](https://docs.ropensci.org/stplanr/reference/od_id.md)
+  : Combine two ID values to create a single ID number
+- [`od_id_order()`](https://docs.ropensci.org/stplanr/reference/od_id_order.md)
+  : Generate ordered ids of OD pairs so lowest is always first This
+  function is slow on large datasets, see szudzik_pairing for faster
+  alternative
+- [`od_oneway()`](https://docs.ropensci.org/stplanr/reference/od_oneway.md)
+  : Aggregate od pairs they become non-directional
+- [`od_to_odmatrix()`](https://docs.ropensci.org/stplanr/reference/od_to_odmatrix.md)
+  : Convert origin-destination data from long to wide format
+- [`odmatrix_to_od()`](https://docs.ropensci.org/stplanr/reference/odmatrix_to_od.md)
+  : Convert origin-destination data from wide to long format
+- [`points2flow()`](https://docs.ropensci.org/stplanr/reference/points2flow.md)
+  : Convert a series of points into geographical flows
+- [`points2odf()`](https://docs.ropensci.org/stplanr/reference/points2odf.md)
+  : Convert a series of points into a dataframe of origins and
+  destinations
+
+## Work with (desire) lines
+
+- [`angle_diff()`](https://docs.ropensci.org/stplanr/reference/angle_diff.md)
+  : Calculate the angular difference between lines and a predefined
+  bearing
+
+- [`geo_toptail()`](https://docs.ropensci.org/stplanr/reference/geo_toptail.md)
+  : Clip the first and last n metres of SpatialLines
+
+- [`is_linepoint()`](https://docs.ropensci.org/stplanr/reference/is_linepoint.md)
+  : Identify lines that are points
+
+- [`line2df()`](https://docs.ropensci.org/stplanr/reference/line2df.md)
+  : Convert geographic line objects to a data.frame with from and to
+  coords
+
+- [`line2points()`](https://docs.ropensci.org/stplanr/reference/line2points.md)
+  [`line2pointsn()`](https://docs.ropensci.org/stplanr/reference/line2points.md)
+  [`line2vertices()`](https://docs.ropensci.org/stplanr/reference/line2points.md)
+  : Convert a spatial (linestring) object to points
+
+- [`line_bearing()`](https://docs.ropensci.org/stplanr/reference/line_bearing.md)
+  : Find the bearing of straight lines
+
+- [`line_breakup()`](https://docs.ropensci.org/stplanr/reference/line_breakup.md)
+  : Break up line objects into shorter segments
+
+- [`line_midpoint()`](https://docs.ropensci.org/stplanr/reference/line_midpoint.md)
+  : Find the mid-point of lines
+
+- [`line_segment()`](https://docs.ropensci.org/stplanr/reference/line_segment.md)
+  : Divide an sf object with LINESTRING geometry into regular segments
+
+- [`line_segment1()`](https://docs.ropensci.org/stplanr/reference/line_segment1.md)
+  : Segment a single line, using lwgeom or rsgeo
+
+- [`line_via()`](https://docs.ropensci.org/stplanr/reference/line_via.md)
+  : Add geometry columns representing a route via intermediary points
+
+- [`mats2line()`](https://docs.ropensci.org/stplanr/reference/mats2line.md)
+  : Convert 2 matrices to lines
+
+- [`n_segments()`](https://docs.ropensci.org/stplanr/reference/n_segments.md)
+  : Vectorised function to calculate number of segments given a max
+  segment length
+
+- [`n_vertices()`](https://docs.ropensci.org/stplanr/reference/n_vertices.md)
+  : Retrieve the number of vertices in sf objects
+
+- [`onewaygeo()`](https://docs.ropensci.org/stplanr/reference/onewaygeo.md)
+  : Aggregate flows so they become non-directional (by geometry - the
+  slow way)
+
+- [`points2line()`](https://docs.ropensci.org/stplanr/reference/points2line.md)
+  : Convert a series of points, or a matrix of coordinates, into a line
+
+- [`toptail_buff()`](https://docs.ropensci.org/stplanr/reference/toptail_buff.md)
+  :
+
+  Clip the beginning and ends of `sf` LINESTRING objects
+
+- [`line_cast()`](https://docs.ropensci.org/stplanr/reference/line_cast.md)
+  : Convert multilinestring object into linestrings
+
+## Work with and analyse routes
+
+- [`route_average_gradient()`](https://docs.ropensci.org/stplanr/reference/route_average_gradient.md)
+  : Return average gradient across a route
+- [`route_rolling_average()`](https://docs.ropensci.org/stplanr/reference/route_rolling_average.md)
+  : Return smoothed averages of vector
+- [`route_rolling_diff()`](https://docs.ropensci.org/stplanr/reference/route_rolling_diff.md)
+  : Return smoothed differences between vector values
+- [`route_rolling_gradient()`](https://docs.ropensci.org/stplanr/reference/route_rolling_gradient.md)
+  : Calculate rolling average gradient from elevation data at segment
+  level
+- [`route_sequential_dist()`](https://docs.ropensci.org/stplanr/reference/route_sequential_dist.md)
+  : Calculate the sequential distances between sequential coordinate
+  pairs
+- [`route_slope_matrix()`](https://docs.ropensci.org/stplanr/reference/route_slope_matrix.md)
+  : Calculate the gradient of line segments from a matrix of coordinates
+- [`route_slope_vector()`](https://docs.ropensci.org/stplanr/reference/route_slope_vector.md)
+  : Calculate the gradient of line segments from distance and elevation
+  vectors
+- [`route()`](https://docs.ropensci.org/stplanr/reference/route.md) :
+  Plan routes on the transport network
+- [`route_bikecitizens()`](https://docs.ropensci.org/stplanr/reference/route_bikecitizens.md)
+  : Get a route from the BikeCitizens web service
+- [`route_dodgr()`](https://docs.ropensci.org/stplanr/reference/route_dodgr.md)
+  : Route on local data using the dodgr package
+- [`route_google()`](https://docs.ropensci.org/stplanr/reference/route_google.md)
+  : Find shortest path using Google services
+- [`route_nearest_point()`](https://docs.ropensci.org/stplanr/reference/route_nearest_point.md)
+  : Find nearest route to a given point
+- [`route_network_sf`](https://docs.ropensci.org/stplanr/reference/route_network_sf.md)
+  : Spatial lines dataset representing a route network
+- [`route_network_small`](https://docs.ropensci.org/stplanr/reference/route_network_small.md)
+  : Spatial lines dataset representing a small route network
+- [`route_osrm()`](https://docs.ropensci.org/stplanr/reference/route_osrm.md)
+  : Plan routes on the transport network using the OSRM server
+- [`route_split()`](https://docs.ropensci.org/stplanr/reference/route_split.md)
+  : Split route in two at point on or near network
+- [`route_split_id()`](https://docs.ropensci.org/stplanr/reference/route_split_id.md)
+  : Split route based on the id or coordinates of one of its vertices
+- [`routes_fast_sf`](https://docs.ropensci.org/stplanr/reference/routes_fast_sf.md)
+  : Spatial lines dataset of commuter flows on the travel network
+- [`routes_slow_sf`](https://docs.ropensci.org/stplanr/reference/routes_slow_sf.md)
+  : Spatial lines dataset of commuter flows on the travel network
+
+## Routing
+
+- [`route()`](https://docs.ropensci.org/stplanr/reference/route.md) :
+  Plan routes on the transport network
+- [`route_dodgr()`](https://docs.ropensci.org/stplanr/reference/route_dodgr.md)
+  : Route on local data using the dodgr package
+- [`route_osrm()`](https://docs.ropensci.org/stplanr/reference/route_osrm.md)
+  : Plan routes on the transport network using the OSRM server
+
+## Work with nodes
+
+- [`geo_code()`](https://docs.ropensci.org/stplanr/reference/geo_code.md)
+  : Convert text strings into points on the map
+
+## Route network functions
+
+- [`rnet_add_node()`](https://docs.ropensci.org/stplanr/reference/rnet_add_node.md)
+  : Add a node to route network
+- [`rnet_boundary_points()`](https://docs.ropensci.org/stplanr/reference/rnet_boundary_points.md)
+  [`rnet_boundary_df()`](https://docs.ropensci.org/stplanr/reference/rnet_boundary_points.md)
+  [`rnet_boundary_unique()`](https://docs.ropensci.org/stplanr/reference/rnet_boundary_points.md)
+  [`rnet_boundary_points_lwgeom()`](https://docs.ropensci.org/stplanr/reference/rnet_boundary_points.md)
+  [`rnet_duplicated_vertices()`](https://docs.ropensci.org/stplanr/reference/rnet_boundary_points.md)
+  : Get points at the beginner and end of linestrings
+- [`rnet_breakup_vertices()`](https://docs.ropensci.org/stplanr/reference/rnet_breakup_vertices.md)
+  : Break up an sf object with LINESTRING geometry.
+- [`rnet_connected()`](https://docs.ropensci.org/stplanr/reference/rnet_connected.md)
+  : Keep only segments connected to the largest group in a network
+- [`rnet_cycleway_intersection`](https://docs.ropensci.org/stplanr/reference/rnet_cycleway_intersection.md)
+  : Example of cycleway intersection data showing problems for
+  SpatialLinesNetwork objects
+- [`rnet_get_nodes()`](https://docs.ropensci.org/stplanr/reference/rnet_get_nodes.md)
+  : Extract nodes from route network
+- [`rnet_group()`](https://docs.ropensci.org/stplanr/reference/rnet_group.md)
+  : Assign segments in a route network to groups
+- [`rnet_join()`](https://docs.ropensci.org/stplanr/reference/rnet_join.md)
+  : Join route networks
+- [`rnet_merge()`](https://docs.ropensci.org/stplanr/reference/rnet_merge.md)
+  : Merge route networks, keeping attributes with aggregating functions
+- [`rnet_overpass`](https://docs.ropensci.org/stplanr/reference/rnet_overpass.md)
+  : Example of overpass data showing problems for SpatialLinesNetwork
+  objects
+- [`rnet_roundabout`](https://docs.ropensci.org/stplanr/reference/rnet_roundabout.md)
+  : Example of roundabout data showing problems for SpatialLinesNetwork
+  objects
+- [`rnet_subset()`](https://docs.ropensci.org/stplanr/reference/rnet_subset.md)
+  : Subset one route network based on overlaps with another
+- [`overline()`](https://docs.ropensci.org/stplanr/reference/overline.md)
+  [`overline2()`](https://docs.ropensci.org/stplanr/reference/overline.md)
+  : Convert series of overlapping lines into a route network
+- [`overline_intersection()`](https://docs.ropensci.org/stplanr/reference/overline_intersection.md)
+  : Convert series of overlapping lines into a route network
+- [`gsection()`](https://docs.ropensci.org/stplanr/reference/gsection.md)
+  : Function to split overlapping SpatialLines into segments
+- [`islines()`](https://docs.ropensci.org/stplanr/reference/islines.md)
+  : Do the intersections between two geometries create lines?
+
+## Geographic functions
+
+- [`bbox_scale()`](https://docs.ropensci.org/stplanr/reference/bbox_scale.md)
+  : Scale a bounding box
+
+- [`bind_sf()`](https://docs.ropensci.org/stplanr/reference/bind_sf.md)
+  : Rapid row-binding of sf objects
+
+- [`geo_bb()`](https://docs.ropensci.org/stplanr/reference/geo_bb.md) :
+  Flexible function to generate bounding boxes
+
+- [`geo_bb_matrix()`](https://docs.ropensci.org/stplanr/reference/geo_bb_matrix.md)
+  : Create matrix representing the spatial bounds of an object
+
+- [`geo_buffer()`](https://docs.ropensci.org/stplanr/reference/geo_buffer.md)
+  : Perform a buffer operation on a temporary projected CRS
+
+- [`geo_length()`](https://docs.ropensci.org/stplanr/reference/geo_length.md)
+  : Calculate line length of line with geographic or projected CRS
+
+- [`geo_projected()`](https://docs.ropensci.org/stplanr/reference/geo_projected.md)
+  : Perform GIS functions on a temporary, projected version of a spatial
+  object
+
+- [`geo_select_aeq()`](https://docs.ropensci.org/stplanr/reference/geo_select_aeq.md)
+  : Select a custom projected CRS for the area of interest
+
+- [`quadrant()`](https://docs.ropensci.org/stplanr/reference/quadrant.md)
+  : Split a spatial object into quadrants
+
+- [`stplanr-deprecated`](https://docs.ropensci.org/stplanr/reference/stplanr-deprecated.md)
+  : Deprecated functions in stplanr
+
+- [`stplanr-package`](https://docs.ropensci.org/stplanr/reference/stplanr-package.md)
+  [`stplanr`](https://docs.ropensci.org/stplanr/reference/stplanr-package.md)
+  :
+
+  **stplanr: Sustainable Transport Planning with R**
+
+## Get transport data
+
+- [`cents_sf`](https://docs.ropensci.org/stplanr/reference/cents_sf.md)
+  : Spatial points representing home locations
+- [`destinations_sf`](https://docs.ropensci.org/stplanr/reference/destinations_sf.md)
+  : Example destinations data
+- [`flow`](https://docs.ropensci.org/stplanr/reference/flow.md) : Data
+  frame of commuter flows
+- [`flow_dests`](https://docs.ropensci.org/stplanr/reference/flow_dests.md)
+  : Data frame of invented commuter flows with destinations in a
+  different layer than the origins
+- [`flowlines_sf`](https://docs.ropensci.org/stplanr/reference/flowlines_sf.md)
+  : Spatial lines dataset of commuter flows
+- [`od_data_lines`](https://docs.ropensci.org/stplanr/reference/od_data_lines.md)
+  : Example of desire line representations of origin-destination data
+  from UK Census
+- [`od_data_routes`](https://docs.ropensci.org/stplanr/reference/od_data_routes.md)
+  : Example segment-level route data
+- [`od_data_sample`](https://docs.ropensci.org/stplanr/reference/od_data_sample.md)
+  : Example of origin-destination data from UK Census
+- [`osm_net_example`](https://docs.ropensci.org/stplanr/reference/osm_net_example.md)
+  : Example of OpenStreetMap road network
+- [`read_table_builder()`](https://docs.ropensci.org/stplanr/reference/read_table_builder.md)
+  : Import and format Australian Bureau of Statistics (ABS) TableBuilder
+  files
+- [`route_network_sf`](https://docs.ropensci.org/stplanr/reference/route_network_sf.md)
+  : Spatial lines dataset representing a route network
+- [`route_network_small`](https://docs.ropensci.org/stplanr/reference/route_network_small.md)
+  : Spatial lines dataset representing a small route network
+- [`routes_fast_sf`](https://docs.ropensci.org/stplanr/reference/routes_fast_sf.md)
+  : Spatial lines dataset of commuter flows on the travel network
+- [`routes_slow_sf`](https://docs.ropensci.org/stplanr/reference/routes_slow_sf.md)
+  : Spatial lines dataset of commuter flows on the travel network
+- [`zones_sf`](https://docs.ropensci.org/stplanr/reference/zones_sf.md)
+  : Spatial polygons of home locations for flow analysis.
+
+## Example data
+
+# Articles
+
+### All vignettes
+
+- [Merging route
+  networks](https://docs.ropensci.org/stplanr/articles/merging-route-networks.md):
+- [Origin-destination data with
+  stplanr](https://docs.ropensci.org/stplanr/articles/stplanr-od.md):
+- [stplanr: A Package for Transport
+  Planning](https://docs.ropensci.org/stplanr/articles/stplanr-paper.md):
+- [Parallel routing and performance with
+  stplanr](https://docs.ropensci.org/stplanr/articles/stplanr-parallel.md):
+- [Route networks with
+  stplanr](https://docs.ropensci.org/stplanr/articles/stplanr-route-nets.md):
+- [Transport routing with
+  stplanr](https://docs.ropensci.org/stplanr/articles/stplanr-routing.md):
+- [Introducing
+  stplanr](https://docs.ropensci.org/stplanr/articles/stplanr.md):

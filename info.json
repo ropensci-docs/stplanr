@@ -1,0 +1,13 @@
+{
+  "commit": {
+    "commit": "c7fd7f0a5c67b4ef448ed4d1275bdd8d97562d79",
+    "author": "robinlovelace <rob00x@gmail.com>",
+    "time": "2025-04-17T22:11:30Z",
+    "files": 1,
+    "merge": false,
+    "message": "Remove macOS tests from workflow\n"
+  },
+  "repo": "https://github.com/ropensci/stplanr",
+  "pkg": "stplanr",
+  "time": "2026-08-30T07:38:09Z"
+}
