@@ -1,0 +1,415 @@
+# Introducing stplanr
+
+## Introduction
+
+The purpose of this vignette is to get you up-to-speed with the basics
+and provide useful links for doing transport research with R.
+
+**stplanr** was initially developed to answer a practical question: how
+to convert official data on travel behaviour into geographic objects
+that can be plotted on a map and analysed using methods from
+geographical information systems (GIS)? Specifically, how can
+origin-destination (OD) data, such as the open datasets provided by the
+UK Data Services WICID portal (see
+[wicid.ukdataservice.ac.uk/](https://wicid.ukdataservice.ac.uk/)), be
+used to estimate cycling potential down to the street levels at city and
+national levels? The project was initially developed to support the
+Propensity to Cycle Tool (PCT), which has now been deployed as a
+national web application hosted at www.pct.bike and written-up as an
+academic paper (Lovelace et al. 2017).
+
+**stplanr** has since grown to include a wide range of functions for
+transport planning. The package was
+[reviewed](https://github.com/ropensci/software-review/issues/10)
+through the rOpenSci package review process and the package is now
+hosted on their site. See the website at
+[docs.ropensci.org/stplanr](https://docs.ropensci.org/stplanr/). A more
+detailed overview of the package’s aims and capabilities is contained in
+a [longer
+vignette](https://github.com/ropensci/stplanr/blob/master/vignettes/stplanr-paper.Rmd),
+which has since been published in the R Journal (Lovelace and Ellison
+2018).
+
+## Installing stplanr
+
+If you’re new to programming and transport data, we recommend using
+**stplanr** interactively in an Integrated Development Environment
+(IDE), [RStudio](https://posit.co/download/rstudio-desktop/). Broader
+guidance on R set-up can be found in Efficient R Programming (Gillespie
+and Lovelace 2016), RStudio’s [Education
+pages](https://education.rstudio.com/learn/beginner/) and on
+[CRAN](https://cran.r-project.org/).
+
+Once you have an R set-up you are happy with, the latest version can be
+installed as follows:
+
+``` r
+
+install.packages("stplanr")
+```
+
+To install the development version, which may have new features, can be
+installed as follows:
+
+``` r
+
+remotes::install_github("ropensci/stplanr")
+```
+
+Load the package as follows:
+
+``` r
+
+library(stplanr)
+```
+
+**stplanr** contains many datasets for testing and demonstrating how R
+can be used for transport planning. The names of these datasets (which
+are loaded ‘lazily’ into your namespace when you attach **stplanr**) are
+listed below:
+
+``` r
+
+data(package = "stplanr")$result[, "Item"]
+```
+
+    ##  [1] "cents_sf"                   "destinations_sf"           
+    ##  [3] "flow"                       "flow_dests"                
+    ##  [5] "flowlines_sf"               "od_data_lines"             
+    ##  [7] "od_data_routes"             "od_data_sample"            
+    ##  [9] "osm_net_example"            "rnet_cycleway_intersection"
+    ## [11] "rnet_overpass"              "rnet_roundabout"           
+    ## [13] "route_network_sf"           "route_network_small"       
+    ## [15] "routes_fast_sf"             "routes_slow_sf"            
+    ## [17] "zones_sf"
+
+A more complete list of functions in the package can be found here:
+<https://docs.ropensci.org/stplanr/reference/index.html>.
+
+## OD data to desire lines and routes
+
+Transport data can take many forms. R is an appropriate language for
+handling transport data, as it can read-in data in such a wide range of
+formats, e.g. with packages such as **haven** and **foreign**. This
+section focusses on OD datasets, and their conversion to *desire lines*
+and *routes* because these are foundational data types for many
+transport research applications. (**stplanr** also contains functions
+for: the analysis of road traffic casualty data, interfacing with
+various routing APIs, ‘travel watershed’ analyis and access to Google’s
+Travel Matrix API.)
+
+Origin-destination (OD) data is simply data in the following form:
+
+``` r
+
+od_eg <- read.csv(
+  text =
+  "origin, destination, V1, V2
+  1, 2, 100, 3
+  1, 3, 50, 5"
+)
+knitr::kable(od_eg)
+```
+
+| origin | destination |  V1 |  V2 |
+|-------:|------------:|----:|----:|
+|      1 |           2 | 100 |   3 |
+|      1 |           3 |  50 |   5 |
+
+What this example OD table means is that 100 units of ‘V1’ and 3 units
+of V2 travel between zone 1 and zone 2. There is also movement
+represented between Zone 1 and 3.
+
+This dataset can also be represent as an ‘od matrix’, where rows
+represent the origins and columns destinations. However, for multiple
+variables (e.g. modes of transport) and to prevent giant and unwieldy
+sparse matrices, the ‘long’ form represented above is much more common.
+
+Now, imagine that V1 represents the total number of people travelling
+between the origin and destination and that V2 represents the number who
+regularly cycle. From this we can get a good indication of where people
+cycle at the desire line level. (Note: a good source of open OD data has
+been made available from the
+[wicid.ukdataservice.ac.uk](https://wicid.ukdataservice.ac.uk/)
+website).
+
+To extract useful information from this OD dataset, we need to be able
+to place the lines on the map. What kind of place does a desire line
+originate from? What about the destination? What is the environment like
+that it passes through? To answer all these questions we need a
+geographic representation of the OD table illustrated above.
+
+## Converting OD data to desire lines with R
+
+One problem with OD data is that the rows do not tend to have geography
+inherently built in. They could contain a variables called `lat_origin`,
+`lon_origin`, `lat_destination` and `lon_destination`. But generally
+they only contain the IDs of geographic zones.
+
+Work is needed to convert the OD data into ‘desire lines’. Desire lines
+are straight lines between the origin and destination and represent
+where people would go if they were not constrained by the route network
+(see Figure 3 from (Lovelace et al. 2017)).
+
+To show how these desire lines are created, we’ll switch to using real
+OD data provided by **stplanr**. The first three of these is shown
+below:
+
+``` r
+
+head(flow[c(1:3, 12)])
+```
+
+    ##        Area.of.residence Area.of.workplace All Bicycle
+    ## 920573         E02002361         E02002361 109       2
+    ## 920575         E02002361         E02002363  38       0
+    ## 920578         E02002361         E02002367  10       0
+    ## 920582         E02002361         E02002371  44       3
+    ## 920587         E02002361         E02002377  34       0
+    ## 920591         E02002361         E02002382   7       0
+
+This shows that, between zone E02002361 and E02002361 (i.e. intrazonal
+flow) there were 109 people travelling to work by all modes in the 2011
+census. 2 of them cycled. The equivalent numbers for the OD pair
+E02002361 to E02002371 were 44 and 3. But how to make this data
+geographical?
+
+For that we need another dataset, also provided by **stplanr**:
+
+``` r
+
+head(cents_sf)
+```
+
+    ##       geo_code  MSOA11NM percent_fem  avslope             geometry
+    ## 1708 E02002384 Leeds 055    0.458721 2.856563 -1.546463, 53.809517
+    ## 1712 E02002382 Leeds 053    0.438144 2.284782 -1.511861, 53.811611
+    ## 1805 E02002393 Leeds 064    0.408759 2.361707 -1.524205, 53.804098
+    ## 1925 E02002367 Leeds 038    0.591141 5.091685 -1.550806, 53.824420
+    ## 1928 E02002363 Leeds 034    0.525161 3.076791 -1.535617, 53.828473
+    ## 1930 E02002361 Leeds 032    0.511777 3.589363 -1.516734, 53.828874
+
+The `cents_sf` dataset is *spatial*, as defined in the `sf` package. The
+default [`plot()`](https://rdrr.io/r/graphics/plot.default.html) method
+for `sf` objects creates a map, as illustrated below:
+
+``` r
+
+library(sf)
+```
+
+    ## Linking to GEOS 3.12.1, GDAL 3.8.4, PROJ 9.4.0; sf_use_s2() is TRUE
+
+``` r
+
+class(cents_sf)
+```
+
+    ## [1] "sf"         "data.frame"
+
+``` r
+
+plot(cents_sf)
+```
+
+![](stplanr_files/figure-html/unnamed-chunk-9-1.png)
+
+**stplanr** creates desire lines using the
+[`od2line()`](https://docs.ropensci.org/stplanr/reference/od2line.md)
+function, which links geographical and non-geographical datasets
+together. Note: this functionality has been superseded by functions in
+the `od` package. In this case, it will join the non-geographical `flow`
+data with the geographical `cents_sf` data plotted above. Let’s take a
+single OD pair, E02002361 to E02002371, the fourth row represented in
+the table above, to see how this works:
+
+``` r
+
+flow_single_line <- od_data_sample[2:3, ] # select only the first line
+desire_line_single <- od2line(flow = flow_single_line, zones = cents_sf)
+```
+
+This can be plotted as follows:
+
+``` r
+
+plot(desire_line_single$geometry, lwd = 5)
+plot(cents_sf, add = TRUE, cex = 5)
+```
+
+    ## Warning in plot.sf(cents_sf, add = TRUE, cex = 5): ignoring all but the first
+    ## attribute
+
+![](stplanr_files/figure-html/unnamed-chunk-11-1.png)
+
+The following command creates desire lines longer than than 2km in
+distance via the
+[`geo_length()`](https://docs.ropensci.org/stplanr/reference/geo_length.md)
+function — omitting ‘internal flows’ via the `sel` object below —
+represented in the dataset `flowlines`:
+
+``` r
+
+l <- od2line(flow = flow, zones = cents_sf)
+# identify 'intrazone flows'
+sel_intra <- l$Area.of.residence == l$Area.of.workplace
+# find distances
+l_distances <- geo_length(l)
+summary(l_distances)
+```
+
+    ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+    ##       0    1097    1466    1520    2285    2935
+
+``` r
+
+sel_dist <- l_distances > 2000
+sel <- !sel_intra & sel_dist
+l <- l[sel, ]
+```
+
+This creates the geographic data object `l`, which can be visualised as
+follows:
+
+``` r
+
+plot(l)
+```
+
+Now the data is set-up, we can change the visual appearance of the
+desire lines with a single extra argument passed to the plotting
+function. Let’s make width depend on the total number of people
+travelling along the desire line:
+
+``` r
+
+lwd <- l$All / mean(l$All)
+plot(st_geometry(l), lwd = lwd)
+```
+
+![](stplanr_files/figure-html/unnamed-chunk-15-1.png)
+
+Another useful visualisation involves setting the colour relative to the
+number of people cycling:
+
+``` r
+
+plot(l["Bicycle"], lwd = lwd)
+```
+
+![](stplanr_files/figure-html/unnamed-chunk-16-1.png)
+
+Finally, we can convert these desire lines into routes as follows (other
+routing functions can be used, but may require API keys to work - see
+the [`cyclestreets`](https://cran.r-project.org/package=cyclestreets)
+package documentation for example):
+
+``` r
+
+# if the next line returns FALSE the code will not run
+r <- route(l = l, route_fun = cyclestreets::journey)
+```
+
+These routes contain the same information on origin and destination, but
+have additional spatial information about the route network. The routes
+can be plotted in the same way as the desire lines were plotted (we will
+use the pre-made data for this):
+
+``` r
+
+r <- stplanr::routes_fast_sf
+plot(r$geometry, lwd = lwd * 3, reset = FALSE)
+```
+
+The next stage is to aggregate these lines together to create a ‘route
+network’. This, and many other functions, are described in the
+[stplanr-paper
+vignette](https://github.com/ropensci/stplanr/blob/master/vignettes/stplanr-paper.Rmd).
+
+## Motivations
+
+As settlements worldwide have grown and become more complex, the process
+of planning has had to adapt. Planners today are specialists, in
+sub-fields such as Emergency, Logistics, Healthcare, Urban and Transport
+Planning. The ‘art’ of planning has become more of a science, with its
+own array of specialist hardware and software.
+
+Like other types of planning, new technologies are changing and in many
+ways improving the practice of Transport Planning. Transport
+interventions such as new bridges, ports and active travel routes are no
+longer only decided based on the intuition of public sector or political
+authorities. Decisions are now the result of a long socio-technical
+process involving public consultation, cost-benefit analyses and
+computer modeling and visualisation. With the ongoing digital
+revolution, the importance of this last stage has grown, to the point
+where transport planning is now a highly technical process, employing
+dozens of software developers in large planning organizations. There is
+now a multi-billion pound global transport planning consultancy
+industry, to support the decision-making process. Yet the results of all
+this labor are unavailable to the vast majority of citizens worldwide.
+Transport planning decisions which go against the best available
+evidence keep getting made.
+
+In this context the aim of **stplanr** is to provide an accessible
+toolbox for transport planning, with a focus on geographic data. It is
+hoped that it will be useful for practitioners and researchers alike, as
+part of the ongoing transition to open source software taking place in
+the tech industry.
+
+A further motivation is that the best available
+[evidence](https://www.nature.com/articles/nclimate2923) suggests the
+future of civilization depends on our ability to transition away from
+fossil fuels. The transport sector is the fastest growing source of
+emissions by sector, and represents a major roadblock in the path
+towards a zero-carbon economy. Transport systems are also a major cause
+of ill health, by enabling sedentary lifestyles and causing numerous
+road traffic casualties. Knowledge of these impacts motivated the word
+‘sustainable’ in the package’s name: by focusing on active travel and
+public transport modes, **stplanr** is intended to encourage
+interventions that reduce dependence on fossil fuels.
+
+## Further resources
+
+**stplanr** is focussed on geographic data. The reason for this is that
+almost all transport data, from the spatial distribution of bus stops to
+the routes that pedestrians take between home and work, contains a
+spatial element. Representing this spatial data in a formal class system
+has many advantages, including sensible defaults for plotting the
+spatial data on a map and support for a range of geographic operations.
+
+**sf** supports most common geographic data formats used in transport
+planning (including Shapefiles and GeoJSON files representing points,
+lines, zones). See *stplanr: A package for transport planning* (Lovelace
+and Ellison 2018) for details.
+
+To get the best out of **stplanr** it helps to have a strong
+understanding of spatial data in R in general. Chapter 2 of the open
+source book [*Geocomputation with R*](https://r.geocompx.org/) provides
+an introductory tutorial on the basics of spatial data with R and
+contains references to more advanced tutorials which may come in handy
+as your spatial data analysis skills progress. Further information on
+geographic data for transport applications can be found in the same
+book. See <https://r.geocompx.org/transport.html>.
+
+## Contributing
+
+We welcome your contributions, whether it’s filing a bug or feature
+request in the [issue
+tracker](https://github.com/ropensci/stplanr/issues), putting in a pull
+request to improve performance or documentation, or simply letting us
+know how you’re using **stplanr** in your work by citing it or dropping
+us an email.
+
+## References
+
+Gillespie, Colin, and Robin Lovelace. 2016. *Efficient R Programming: A
+Practical Guide to Smarter Programming*. O’Reilly Media.
+
+Lovelace, Robin, and Richard Ellison. 2018. “Stplanr: A Package for
+Transport Planning.” *The R Journal* 10 (2): 7–23.
+<https://doi.org/10.32614/RJ-2018-053>.
+
+Lovelace, Robin, Anna Goodman, Rachel Aldred, Nikolai Berkoff, Ali
+Abbas, and James Woodcock. 2017. “The Propensity to Cycle Tool: An Open
+Source Online System for Sustainable Transport Planning.” *Journal of
+Transport and Land Use* 10 (1). <https://doi.org/10.5198/jtlu.2016.862>.
